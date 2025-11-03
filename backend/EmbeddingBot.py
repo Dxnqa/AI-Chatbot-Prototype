@@ -148,20 +148,21 @@ class EmbeddingBot:
     
     # Method: Get LLM response from OpenAI <= Pass embedded context as prompt
     def llm_response(self, prompt:str, context: list[str]) -> str:
-        return self.llm.responses.create(
+        response = self.llm.responses.create(
             model="gpt-5-nano",
             input=[
                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{prompt}".strip()},
                 {"role": "system", "content": self.instructions}
             ]
         )
+        return response.output_text.replace("\n", " ").strip()
         
     def web_search(self, prompt: str, verbosity: str = "medium"):
         web_instructions = (
             "Use web search to provide a helpful, concise answer for the user's query. "
             "Cite or draw from the retrieved sources when relevant."
         )
-        return self.llm.responses.create(
+        response = self.llm.responses.create(
             model="gpt-5-mini",
             tools=[
                 {
@@ -182,3 +183,4 @@ class EmbeddingBot:
             ],
             text={"verbosity": verbosity}
         )
+        return response.output_text.replace("\n", " ").strip()
