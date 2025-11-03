@@ -7,7 +7,8 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from dotenv import load_dotenv
 from openai import OpenAI
 
-DIR = Path(__file__).resolve().parent
+# Set DIR to the project root so DB_PATH points to top-level `testing/database`
+DIR = Path(__file__).resolve().parent.parent
 DB_PATH = DIR / "testing" / "database"
 SOURCE_DIR = DIR / "testing" / "Notes"
 
@@ -155,7 +156,7 @@ class EmbeddingBot:
             ]
         )
         
-    def web_search(self, prompt: str):
+    def web_search(self, prompt: str, verbosity: str = "medium"):
         web_instructions = (
             "Use web search to provide a helpful, concise answer for the user's query. "
             "Cite or draw from the retrieved sources when relevant."
@@ -179,5 +180,5 @@ class EmbeddingBot:
                 {"role": "system", "content": web_instructions},
                 {"role": "user", "content": prompt.strip()},
             ],
-            text={"verbosity": "low"}
+            text={"verbosity": verbosity}
         )

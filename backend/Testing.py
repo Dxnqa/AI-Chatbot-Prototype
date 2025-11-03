@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from EmbeddingBot import EmbeddingBot
 
-DIR = Path(__file__).resolve().parent
+DIR = Path(__file__).resolve().parent.parent
 DB_PATH = DIR / "testing" / "database"
 SOURCE_DIR = DIR / "testing" / "Notes"
 
@@ -38,9 +38,10 @@ while True:
     if response.output_text == assistant.content_not_found:
         print(assistant.content_not_found)
         use_web_search = input("\nConduct web search?: ").strip().lower()
+        verbosity = input("Select verbosity (low, medium, high) [default: medium]: ").strip().lower()
         if use_web_search in {"yes", "y"}:
             print("Performing web search...\n")
-            web_response = assistant.web_search(prompt=user_query)
+            web_response = assistant.web_search(prompt=user_query, verbosity=verbosity)
             print(f"\nWeb Search Response:\n")
             print(f"{web_response.output_text}\n")
         else:
