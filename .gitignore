@@ -21,6 +21,8 @@ sdist/
 var/
 *.egg-info/
 *.egg
+node_modules
+package*
 
 # Virtual environment
 .venv/

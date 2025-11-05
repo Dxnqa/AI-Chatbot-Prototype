@@ -2,10 +2,11 @@ import os
 import sys
 from dotenv import load_dotenv
 from pathlib import Path
-from typing import Union
+from typing import Union, List, Optional
 from fastapi import FastAPI
 from backend.EmbeddingBot import EmbeddingBot
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 # System configurations. Set paths, load environment variables, and initialize EmbeddingBot.
 DIR = Path(__file__).resolve().parent.parent
@@ -22,21 +23,31 @@ assistant = EmbeddingBot(api_key=api_key, db_path=DB_PATH)
 
 collect_files = assistant.collect_files(source_dir=SOURCE_DIR)
 
+class AIPrompt(BaseModel):
+    id: Optional[int] = Field(None, description="Unique identifier for the prompt")
+    title: str = Field(..., description="Short, human-readable name for the prompt")
+    text: str = Field(..., description="The main prompt text to send to the AI model")
+    temperature: float = Field(1.0, ge=0.0, le=2.0, description="Controls randomness")
+    max_tokens: int = Field(512, gt=0, description="Maximum tokens in the response")
+    tags: Optional[List[str]] = Field(default_factory=list, description="List of categories or tags")
+    created_at: Optional[str] = Field(None, description="ISO timestamp of creation")
+    updated_at: Optional[str] = Field(None, description="ISO timestamp of last update")
+    author: Optional[str] = Field(None, description="User or system that created this prompt")
+
 # FastAPI application instance.
 app = FastAPI()
 
 sample_query = "Can I recover files in Linux?"
 
-query = assistant.query_collection(query_text=sample_query, n_results=1).get("documents", [])[0]
-
-context = [f"{i}. {doc}" for i, doc in enumerate(query, start=1)]
-
-response = assistant.llm_response(prompt=sample_query, context=context)
+response = assistant.response(prompt=sample_query, n_results=1)
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the EmbeddingBot API"}
 
-@app.get("/prompt")
-async def get_prompt_response() -> dict[str, str]:
-    return {"response": response}
+@app.put("/prompt/{prompt_id}")
+async def get_prompt_response(prompt_id: int, prompt: AIPrompt,q: str) -> dict[str, str]:
+    result = {"prompt_id": prompt_id, **prompt.dump()}
+    if q:
+        result["response"] = response
+    return result

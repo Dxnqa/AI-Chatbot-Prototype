@@ -1,3 +1,4 @@
+from typing import Optional
 import chromadb
 import uuid
 import os
@@ -38,7 +39,7 @@ class EmbeddingBot:
         logging.info("Collection 'knowledge_base_openai' deleted.")
 
     # Method: Querying collection
-    def query_collection(self, query_text: str, n_results: int = 1) -> dict:
+    def query_collection(self, query_text: str, n_results: Optional[int] = 1) -> dict:
         try:
             results = self.collection.query(
                 query_texts=[query_text],
@@ -142,14 +143,14 @@ class EmbeddingBot:
     content_not_found = "Context not found. Would you like me to improvise using web search?"
     
     instructions = (
-        f"Use the provided context to return a helpful answer for the user's query. "
+        f"Use the provided context to return a helpful answer for the user's query. Format the response clearly and concisely. "
         f"If the answer is not within context, respond with: {content_not_found}"
     )
     
     # Method: Get LLM response from OpenAI <= Pass embedded context as prompt
     def llm_response(self, prompt:str, context: list[str]) -> str:
         response = self.llm.responses.create(
-            model="gpt-5-nano",
+            model="gpt-5",
             input=[
                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{prompt}".strip()},
                 {"role": "system", "content": self.instructions}
@@ -184,3 +185,8 @@ class EmbeddingBot:
             text={"verbosity": verbosity}
         )
         return response.output_text.replace("\n", " ").strip()
+    
+    def response(self, prompt: str, n_results: Optional[int] = 1) -> str:
+        query = self.query_collection(query_text=prompt, n_results=n_results).get("documents", [])[0]
+        context_text = [f"{i}. {doc}" for i, doc in enumerate(query, start=1)]
+        return self.llm_response(prompt=prompt, context=context_text)
