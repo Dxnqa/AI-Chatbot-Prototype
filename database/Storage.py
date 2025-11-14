@@ -1,14 +1,7 @@
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
-from dotenv import load_dotenv
-import os
 from pathlib import Path
-
-load_dotenv()
-
-# Environment variables
-ACCOUNT_URL = os.getenv("AZURE_ACCOUNT_URL")
-BLOB_CONTAINER = os.getenv("BLOB_CONTAINER")
+from backend.config import ACCOUNT_URL, BLOB_CONTAINER
 
 # Initialize Blob Service Client
 credential = DefaultAzureCredential()

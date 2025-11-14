@@ -4,3 +4,4 @@ uuid
 openai
 dotenv
 requests
+qdrant_client

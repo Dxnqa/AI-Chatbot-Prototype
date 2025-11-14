@@ -1,20 +1,11 @@
 from typing import Optional
 import chromadb
 import uuid
-import os
 import logging
 from pathlib import Path
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-from dotenv import load_dotenv
 from openai import OpenAI
-
-# Set DIR to the project root so DB_PATH points to top-level `testing/database`
-DIR = Path(__file__).resolve().parent.parent
-DB_PATH = DIR / "testing" / "database"
-SOURCE_DIR = DIR / "testing" / "Notes"
-
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+from .config import OPENAI_API_KEY ,DB_PATH, SOURCE_DIR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,14 +15,14 @@ class EmbeddingBot:
     def __init__(self, api_key: str, db_path: Path = DB_PATH):
         self.client = chromadb.PersistentClient(path=db_path)
         self.embedding = OpenAIEmbeddingFunction(
-            api_key=api_key,
+            api_key=OPENAI_API_KEY,
             model_name="text-embedding-3-small"
         )
         self.collection = self.client.get_or_create_collection(
             name="knowledge_base_openai",
             embedding_function=self.embedding
         )
-        self.llm = OpenAI(api_key=api_key)
+        self.llm = OpenAI(api_key=OPENAI_API_KEY)
 
     # Method: Delete collection
     def delete_collection(self):

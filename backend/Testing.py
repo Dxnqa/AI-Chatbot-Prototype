@@ -1,20 +1,14 @@
 from dotenv import load_dotenv
-import os
 import sys
 from pathlib import Path
 from EmbeddingBot import EmbeddingBot
+from config import OPENAI_API_KEY, DB_PATH, SOURCE_DIR
 
-DIR = Path(__file__).resolve().parent.parent
-DB_PATH = DIR / "testing" / "database"
-SOURCE_DIR = DIR / "testing" / "Notes"
-
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
+if not OPENAI_API_KEY:
     print("ERROR: OPENAI_API_KEY environment variable is not set.\nPlease set it and re-run the script.")
     sys.exit(1)
-    
-assistant = EmbeddingBot(api_key=api_key, db_path=DB_PATH)
+
+assistant = EmbeddingBot(api_key=OPENAI_API_KEY, db_path=DB_PATH)
 
 collect_files = assistant.collect_files(source_dir=SOURCE_DIR)
 

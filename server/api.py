@@ -1,25 +1,16 @@
 import os
 import sys
-from dotenv import load_dotenv
-from pathlib import Path
 from typing import Union, List, Optional
 from fastapi import FastAPI
 from backend.EmbeddingBot import EmbeddingBot
-from pathlib import Path
+from backend.config import OPENAI_API_KEY, DB_PATH, SOURCE_DIR
 from pydantic import BaseModel, Field
 
-# System configurations. Set paths, load environment variables, and initialize EmbeddingBot.
-DIR = Path(__file__).resolve().parent.parent
-DB_PATH = DIR / "testing" / "database"
-SOURCE_DIR = DIR / "testing" / "Notes"
-
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
+if not OPENAI_API_KEY:
     print("ERROR: OPENAI_API_KEY environment variable is not set.\nPlease set it and re-run the script.")
     sys.exit(1)
 
-assistant = EmbeddingBot(api_key=api_key, db_path=DB_PATH)
+assistant = EmbeddingBot(api_key=OPENAI_API_KEY, db_path=DB_PATH)
 
 collect_files = assistant.collect_files(source_dir=SOURCE_DIR)
 
