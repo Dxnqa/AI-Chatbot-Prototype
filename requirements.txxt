@@ -1,0 +1,6 @@
+azure-storage-blob
+azure-identity
+uuid
+openai
+dotenv
+requests
