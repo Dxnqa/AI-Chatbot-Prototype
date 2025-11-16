@@ -3,7 +3,7 @@ import sys
 from typing import Union, List, Optional
 from fastapi import FastAPI
 from backend.EmbeddingBot import EmbeddingBot
-from backend.config import OPENAI_API_KEY, DB_PATH, SOURCE_DIR
+from config import OPENAI_API_KEY, DB_PATH, SOURCE_DIR
 from pydantic import BaseModel, Field
 
 if not OPENAI_API_KEY:

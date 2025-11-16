@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from openai import OpenAI
-from .config import OPENAI_API_KEY ,DB_PATH, SOURCE_DIR
+from ..config import OPENAI_API_KEY ,DB_PATH, SOURCE_DIR
 
 logging.basicConfig(
     level=logging.INFO,

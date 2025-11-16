@@ -7,7 +7,7 @@ load_dotenv()
 # Azure keys
 ACCOUNT_URL = os.getenv("AZURE_ACCOUNT_URL")
 BLOB_CONTAINER = os.getenv("BLOB_CONTAINER")
-
+BLOB_ACCESS_KEY = os.getenv("BLOB_ACCESS_KEY")
 # Qdrant keys
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
