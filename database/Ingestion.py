@@ -1,381 +1,299 @@
-"""
-Azure Blob Storage to Qdrant RAG Pipeline
-
-This module implements a complete RAG pipeline:
-1. Load documents from Azure Blob Storage (PDFs, DOCX, Markdown, CSVs, TXT)
-2. Parse into LangChain Document objects with metadata
-3. Chunk documents using text splitters
-4. Generate embeddings using OpenAI
-5. Store in Qdrant vector database
-"""
-
+from typing import List, Optional
 import logging
-from typing import List, Optional, Union
-from pathlib import Path
-
+import uuid
 from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
 from langchain_community.document_loaders import (
     PyPDFLoader,
-    Docx2txtLoader,
     TextLoader,
     CSVLoader,
     UnstructuredMarkdownLoader,
 )
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient, models
-
+from qdrant_client.models import PointStruct
 from config import (
+    BLOB_ACCESS_KEY,
     ACCOUNT_URL,
     BLOB_CONTAINER,
-    BLOB_ACCESS_KEY,
     QDRANT_API_KEY,
     OPENAI_API_KEY,
-    QDRANT_URL,
 )
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s %(levelname)s %(message)s"
 )
-logger = logging.getLogger(__name__)
 
 
 class IngestionPipeline:
     """
-    Complete RAG pipeline for ingesting documents from Azure Blob Storage
-    and storing them in Qdrant vector database.
+    A complete RAG ingestion pipeline that:
+    1. Loads documents from Azure Blob Storage
+    2. Parses them into LangChain Document objects
+    3. Chunks the documents
+    4. Generates embeddings
+    5. Stores them in Qdrant vector database
     """
-
-    # Embedding model dimensions
-    EMBEDDING_DIM = 1536  # text-embedding-3-small dimension
-    EMBEDDING_MODEL = "text-embedding-3-small"
-
+    
     def __init__(
         self,
+        qdrant_url: str = "https://21cdf154-5bc6-4325-bd5d-965464adfde7.us-west-2-0.aws.cloud.qdrant.io",
         collection_name: str = "knowledge_base",
-        chunk_size: int = 1500,
+        embedding_model: str = "text-embedding-3-small",
+        chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        qdrant_url: Optional[str] = None,
     ):
         """
         Initialize the ingestion pipeline.
-
+        
         Args:
+            qdrant_url: Qdrant instance URL
             collection_name: Name of the Qdrant collection
-            chunk_size: Size of text chunks for splitting
+            embedding_model: OpenAI embedding model name
+            chunk_size: Size of text chunks
             chunk_overlap: Overlap between chunks
-            qdrant_url: Qdrant server URL (defaults to config)
         """
+        self.qdrant_client = QdrantClient(
+            url=qdrant_url,
+            api_key=QDRANT_API_KEY
+        )
         self.collection_name = collection_name
+        self.embeddings = OpenAIEmbeddings(
+            model=embedding_model,
+            openai_api_key=OPENAI_API_KEY
+        )
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
-
-        # Initialize embeddings
-        self.embeddings = OpenAIEmbeddings(
-            model=self.EMBEDDING_MODEL,
-            openai_api_key=OPENAI_API_KEY,
-        )
-
-        # Initialize Qdrant client
-        self.qdrant_url = qdrant_url or QDRANT_URL
-        self.qdrant_client = QdrantClient(
-            url=self.qdrant_url,
-            api_key=QDRANT_API_KEY,
-        )
-
-        # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
         )
-
-        # Ensure collection exists with correct configuration
-        self._ensure_collection()
-
-    def _ensure_collection(self):
-        """Create Qdrant collection if it doesn't exist."""
+        
+        # Ensure collection exists with correct vector size
+        self._ensure_collection_exists()
+    
+    def _ensure_collection_exists(self):
+        """Create Qdrant collection if it doesn't exist with correct vector dimensions."""
+        embedding_dim = 1536  # OpenAI text-embedding-3-small dimension
+        
         if not self.qdrant_client.collection_exists(self.collection_name):
-            logger.info(f"Creating collection '{self.collection_name}'")
             self.qdrant_client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(
-                    size=self.EMBEDDING_DIM,
-                    distance=models.Distance.COSINE,
-                ),
+                    size=embedding_dim,
+                    distance=models.Distance.COSINE
+                )
             )
-            logger.info(f"Collection '{self.collection_name}' created successfully")
+            logging.info(f"Created collection '{self.collection_name}' with vector size {embedding_dim}")
         else:
-            logger.info(f"Collection '{self.collection_name}' already exists")
-
-    def _get_loader_factory(self, file_extension: str):
+            # Verify collection has correct vector size
+            collection_info = self.qdrant_client.get_collection(self.collection_name)
+            if collection_info.config.params.vectors.size != embedding_dim:
+                logging.warning(
+                    f"Collection '{self.collection_name}' has vector size "
+                    f"{collection_info.config.params.vectors.size}, expected {embedding_dim}"
+                )
+    
+    def _get_loader_factory(self, file_type: str):
         """
-        Get appropriate loader factory based on file extension.
-
+        Get the appropriate LangChain loader factory based on file type.
+        
         Args:
-            file_extension: File extension (e.g., '.pdf', '.docx')
-
+            file_type: File extension or type (pdf, txt, csv, md, etc.)
+            
         Returns:
-            Loader class or None for text files
+            Loader class or None
         """
-        extension = file_extension.lower()
+        file_type = file_type.lower()
         loader_map = {
-            ".pdf": PyPDFLoader,
-            ".docx": Docx2txtLoader,
-            ".doc": Docx2txtLoader,
-            ".md": UnstructuredMarkdownLoader,
-            ".markdown": UnstructuredMarkdownLoader,
-            ".csv": CSVLoader,
-            ".txt": TextLoader,
+            "pdf": PyPDFLoader,
+            "txt": TextLoader,
+            "csv": CSVLoader,
+            "md": UnstructuredMarkdownLoader,
+            "markdown": UnstructuredMarkdownLoader,
         }
-        return loader_map.get(extension, TextLoader)
-
+        return loader_map.get(file_type)
+    
     def load_documents_from_azure(
         self,
-        blob_names: Optional[List[str]] = None,
+        blob_names: List[str],
         directory: str = "",
-        file_extensions: Optional[List[str]] = None,
+        file_type: Optional[str] = None,
     ) -> List[Document]:
         """
         Load documents from Azure Blob Storage.
-
+        
         Args:
-            blob_names: Specific blob names to load (if None, loads all)
-            directory: Directory path within container (optional)
-            file_extensions: Filter by file extensions (e.g., ['.pdf', '.docx'])
-
+            blob_names: List of blob names to load
+            directory: Directory path in blob container (optional)
+            file_type: File type/extension (pdf, txt, csv, md). If None, auto-detect from blob name.
+            
         Returns:
             List of LangChain Document objects
         """
-        logger.info(f"Loading documents from Azure Blob Storage: {BLOB_CONTAINER}")
-
-        # Build blob paths
-        if blob_names:
-            blob_paths = [
-                f"{directory}/{name}".strip("/") if directory else name
-                for name in blob_names
-            ]
-        else:
-            # Load all blobs from directory
-            blob_paths = None
-
+        # Build full blob paths
+        blob_paths = []
+        for blob_name in blob_names:
+            if directory:
+                full_path = blob_name if blob_name.startswith(directory) else f"{directory}/{blob_name}"
+            else:
+                full_path = blob_name
+            blob_paths.append(full_path)
+        
+        # Auto-detect file type if not provided
+        if file_type is None and blob_names:
+            file_ext = blob_names[0].split(".")[-1].lower()
+            file_type = file_ext
+        
+        # Get appropriate loader factory
+        loader_factory = self._get_loader_factory(file_type) if file_type else None
+        
         # Create loader
         loader = AzureBlobStorageLoader(
             account_url=ACCOUNT_URL,
             container_name=BLOB_CONTAINER,
             blob_names=blob_paths,
-            credential=BLOB_ACCESS_KEY,
+            loader_factory=loader_factory,
         )
-
+        
         # Load documents
-        try:
-            documents = loader.load()
-            logger.info(f"Loaded {len(documents)} documents from Azure Blob Storage")
-
-            # Filter by file extension if specified
-            if file_extensions:
-                filtered_docs = []
-                for doc in documents:
-                    # Extract file extension from metadata or source
-                    source = doc.metadata.get("source", "")
-                    if any(source.lower().endswith(ext.lower()) for ext in file_extensions):
-                        filtered_docs.append(doc)
-                documents = filtered_docs
-                logger.info(f"Filtered to {len(documents)} documents matching extensions: {file_extensions}")
-
-            return documents
-        except Exception as e:
-            logger.error(f"Error loading documents from Azure Blob Storage: {e}")
-            raise
-
-    def load_documents_with_parsing(
-        self,
-        blob_names: List[str],
-        directory: str = "",
-    ) -> List[Document]:
-        """
-        Load documents with appropriate parsing based on file type.
-
-        Args:
-            blob_names: List of blob names to load
-            directory: Directory path within container
-
-        Returns:
-            List of parsed LangChain Document objects
-        """
-        all_documents = []
-
-        for blob_name in blob_names:
-            # Determine file extension
-            file_path = Path(blob_name)
-            extension = file_path.suffix
-
-            # Get appropriate loader
-            loader_class = self._get_loader_factory(extension)
-
-            # Build full blob path
-            blob_path = f"{directory}/{blob_name}".strip("/") if directory else blob_name
-
-            logger.info(f"Loading {blob_path} with {loader_class.__name__}")
-
-            try:
-                # Create loader for this specific blob
-                loader = AzureBlobStorageLoader(
-                    account_url=ACCOUNT_URL,
-                    container_name=BLOB_CONTAINER,
-                    blob_names=[blob_path],
-                    credential=BLOB_ACCESS_KEY,
-                    loader_factory=lambda path: loader_class(path) if loader_class else None,
-                )
-
-                docs = loader.load()
-                all_documents.extend(docs)
-                logger.info(f"Successfully loaded {len(docs)} pages/chunks from {blob_name}")
-
-            except Exception as e:
-                logger.error(f"Error loading {blob_name}: {e}")
-                continue
-
-        return all_documents
-
+        documents = loader.load()
+        logging.info(f"Loaded {len(documents)} documents from Azure Blob Storage")
+        return documents
+    
     def chunk_documents(self, documents: List[Document]) -> List[Document]:
         """
         Split documents into chunks.
-
+        
         Args:
             documents: List of LangChain Document objects
-
+            
         Returns:
             List of chunked Document objects
         """
-        logger.info(f"Chunking {len(documents)} documents")
         chunks = self.text_splitter.split_documents(documents)
-        logger.info(f"Created {len(chunks)} chunks")
+        logging.info(f"Split {len(documents)} documents into {len(chunks)} chunks")
         return chunks
-
-    def store_in_qdrant(self, documents: List[Document], batch_size: int = 100):
-        """
-        Store documents in Qdrant vector database.
-
-        Args:
-            documents: List of chunked Document objects
-            batch_size: Number of documents to process in each batch
-        """
-        if not documents:
-            logger.warning("No documents to store")
-            return
-
-        logger.info(f"Storing {len(documents)} documents in Qdrant collection '{self.collection_name}'")
-
-        try:
-            # Use LangChain's QdrantVectorStore for easy integration
-            vector_store = QdrantVectorStore(
-                client=self.qdrant_client,
-                collection_name=self.collection_name,
-                embedding=self.embeddings,
-            )
-
-            # Add documents in batches
-            for i in range(0, len(documents), batch_size):
-                batch = documents[i:i + batch_size]
-                vector_store.add_documents(batch)
-                logger.info(f"Stored batch {i // batch_size + 1} ({len(batch)} documents)")
-
-            logger.info(f"Successfully stored all {len(documents)} documents in Qdrant")
-
-        except Exception as e:
-            logger.error(f"Error storing documents in Qdrant: {e}")
-            raise
-
-    def ingest(
+    
+    def embed_and_store(
         self,
-        blob_names: Optional[List[str]] = None,
-        directory: str = "",
-        file_extensions: Optional[List[str]] = None,
-        use_parsing: bool = True,
+        documents: List[Document],
+        batch_size: int = 100,
     ) -> dict:
         """
-        Complete ingestion pipeline: Load → Chunk → Embed → Store.
-
+        Generate embeddings and store documents in Qdrant.
+        
         Args:
-            blob_names: Specific blob names to load (if None, loads all)
-            directory: Directory path within container
-            file_extensions: Filter by file extensions
-            use_parsing: Use file-specific parsers (PDF, DOCX, etc.)
-
+            documents: List of LangChain Document objects (chunked)
+            batch_size: Number of documents to process in each batch
+            
         Returns:
-            Dictionary with ingestion results and statistics
+            Dictionary with ingestion statistics
         """
-        logger.info("Starting ingestion pipeline")
-
-        try:
-            # Step 1: Load documents
-            if use_parsing and blob_names:
-                documents = self.load_documents_with_parsing(blob_names, directory)
-            else:
-                documents = self.load_documents_from_azure(
-                    blob_names=blob_names,
-                    directory=directory,
-                    file_extensions=file_extensions,
+        total_docs = len(documents)
+        stored_count = 0
+        errors = []
+        
+        # Process in batches
+        for i in range(0, total_docs, batch_size):
+            batch = documents[i:i + batch_size]
+            
+            try:
+                # Extract texts and metadata
+                texts = [doc.page_content for doc in batch]
+                metadatas = [doc.metadata for doc in batch]
+                
+                # Generate embeddings
+                embeddings = self.embeddings.embed_documents(texts)
+                
+                # Create points for Qdrant
+                points = []
+                for text, embedding, metadata in zip(texts, embeddings, metadatas):
+                    point_id = str(uuid.uuid4())
+                    points.append(
+                        PointStruct(
+                            id=point_id,
+                            vector=embedding,
+                            payload={
+                                "text": text,
+                                **metadata,
+                            }
+                        )
+                    )
+                
+                # Upsert to Qdrant
+                self.qdrant_client.upsert(
+                    collection_name=self.collection_name,
+                    points=points
                 )
-
-            if not documents:
-                logger.warning("No documents loaded")
-                return {
-                    "status": "warning",
-                    "message": "No documents loaded",
-                    "documents_loaded": 0,
-                    "chunks_created": 0,
-                    "documents_stored": 0,
-                }
-
-            # Step 2: Chunk documents
-            chunks = self.chunk_documents(documents)
-
-            # Step 3: Store in Qdrant (embedding happens automatically)
-            self.store_in_qdrant(chunks)
-
-            result = {
-                "status": "success",
-                "message": "Ingestion completed successfully",
-                "documents_loaded": len(documents),
-                "chunks_created": len(chunks),
-                "documents_stored": len(chunks),
-            }
-
-            logger.info(f"Ingestion completed: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"Ingestion failed: {e}")
+                
+                stored_count += len(batch)
+                logging.info(f"Stored batch {i//batch_size + 1}: {len(batch)} documents")
+                
+            except Exception as e:
+                error_msg = f"Error processing batch {i//batch_size + 1}: {str(e)}"
+                logging.exception(error_msg)
+                errors.append(error_msg)
+        
+        result = {
+            "status": "partial" if errors else "success",
+            "total_documents": total_docs,
+            "stored_count": stored_count,
+            "errors": errors,
+        }
+        
+        logging.info(f"Ingestion complete: {stored_count}/{total_docs} documents stored")
+        return result
+    
+    def ingest_from_azure(
+        self,
+        blob_names: List[str],
+        directory: str = "",
+        file_type: Optional[str] = None,
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+    ) -> dict:
+        """
+        Complete ingestion pipeline: Load -> Chunk -> Embed -> Store.
+        
+        Args:
+            blob_names: List of blob names to ingest
+            directory: Directory path in blob container
+            file_type: File type/extension (pdf, txt, csv, md)
+            chunk_size: Override default chunk size
+            chunk_overlap: Override default chunk overlap
+            
+        Returns:
+            Dictionary with ingestion results
+        """
+        # Override text splitter settings if provided
+        if chunk_size or chunk_overlap:
+            current_chunk_size = chunk_size if chunk_size else self.chunk_size
+            current_chunk_overlap = chunk_overlap if chunk_overlap else self.chunk_overlap
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=current_chunk_size,
+                chunk_overlap=current_chunk_overlap,
+                length_function=len,
+            )
+        
+        # Step 1: Load documents from Azure
+        documents = self.load_documents_from_azure(
+            blob_names=blob_names,
+            directory=directory,
+            file_type=file_type,
+        )
+        
+        if not documents:
             return {
                 "status": "error",
-                "message": str(e),
-                "documents_loaded": 0,
-                "chunks_created": 0,
-                "documents_stored": 0,
+                "message": "No documents loaded from Azure Blob Storage",
             }
-
-
-# Convenience function for backward compatibility
-def load_documents_from_azure(
-    blob_names: List[str],
-    directory: str = "",
-    pdf: bool = False,
-) -> List[Document]:
-    """
-    Legacy function for loading documents from Azure Blob Storage.
-
-    Args:
-        blob_names: List of blob names to load
-        directory: Directory path within container
-        pdf: Whether files are PDFs (deprecated, auto-detected now)
-
-    Returns:
-        List of LangChain Document objects
-    """
-    pipeline = IngestionPipeline()
-    return pipeline.load_documents_with_parsing(blob_names, directory)
+        
+        # Step 2: Chunk documents
+        chunks = self.chunk_documents(documents)
+        
+        # Step 3: Embed and store in Qdrant
+        return self.embed_and_store(chunks)
