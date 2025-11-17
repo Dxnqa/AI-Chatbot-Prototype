@@ -4,4 +4,12 @@ uuid
 openai
 dotenv
 requests
-qdrant_client
+qdrant-client
+langchain
+langchain-azure-storage
+langchain-qdrant
+langchain-community
+langchain-openai
+pypdf
+python-docx
+pandas
