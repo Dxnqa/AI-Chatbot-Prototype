@@ -19,6 +19,8 @@ from config import (
     BLOB_CONTAINER,
     QDRANT_API_KEY,
     OPENAI_API_KEY,
+    QDRANT_URL,
+    QDRANT_COLLECTION_NAME
 )
 
 logging.basicConfig(
@@ -39,8 +41,8 @@ class IngestionPipeline:
     
     def __init__(
         self,
-        qdrant_url: str = "https://21cdf154-5bc6-4325-bd5d-965464adfde7.us-west-2-0.aws.cloud.qdrant.io",
-        collection_name: str = "knowledge_base",
+        qdrant_url: str = QDRANT_URL,
+        collection_name: str = QDRANT_COLLECTION_NAME,
         embedding_model: str = "text-embedding-3-small",
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
