@@ -222,18 +222,19 @@ class IngestionPipeline:
         logging.info(f"Ingestion complete: {stored_count}/{total_docs} documents stored")
         return result
         
-        # Extract texts and metadata
-    def extract_from_documents(self, batch: List[Document]):
-        texts = [doc.page_content for doc in batch]
-        metadatas = [doc.metadata for doc in batch]
-        return texts, metadatas
-    
-    # Generate embeddings
-    def embed_documents(self, texts: List[str]):
-        return self.embeddings.embed_documents(texts)
-    
     # Create points for Qdrant
     def create_points(self, texts, embeddings, metadatas):
+        """
+        Create points for Qdrant.
+        
+        Args:
+            texts: List of texts to embed
+            embeddings: List of embeddings
+            metadatas: List of metadata
+            
+        Returns:
+            List of PointStruct objects
+        """
         points = []
         for text, embedding, metadata in zip(texts, embeddings, metadatas):
             point_id = str(uuid.uuid4())
@@ -248,6 +249,16 @@ class IngestionPipeline:
                 )
             )
         return points
+        
+    # Extract texts and metadata
+    def extract_from_documents(self, batch: List[Document]):
+        texts = [doc.page_content for doc in batch]
+        metadatas = [doc.metadata for doc in batch]
+        return texts, metadatas
+    
+    # Generate embeddings
+    def embed_documents(self, texts: List[str]):
+        return self.embeddings.embed_documents(texts)
     
     # Upsert to Qdrant
     def upsert_to_qdrant(self, points: List[PointStruct]):
