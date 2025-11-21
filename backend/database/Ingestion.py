@@ -14,7 +14,6 @@ from langchain_core.documents import Document
 from qdrant_client import QdrantClient, models
 from qdrant_client.models import PointStruct
 from config import (
-    BLOB_ACCESS_KEY,
     ACCOUNT_URL,
     BLOB_CONTAINER,
     QDRANT_API_KEY,
