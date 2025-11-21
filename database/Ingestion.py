@@ -204,37 +204,10 @@ class IngestionPipeline:
             batch = documents[i:i + batch_size]
             
             try:
-                # Extract texts and metadata
-                texts = [doc.page_content for doc in batch]
-                metadatas = [doc.metadata for doc in batch]
-                
-                # Generate embeddings
-                embeddings = self.embeddings.embed_documents(texts)
-                
-                # Create points for Qdrant
-                points = []
-                for text, embedding, metadata in zip(texts, embeddings, metadatas):
-                    point_id = str(uuid.uuid4())
-                    points.append(
-                        PointStruct(
-                            id=point_id,
-                            vector=embedding,
-                            payload={
-                                "text": text,
-                                **metadata,
-                            }
-                        )
-                    )
-                
-                # Upsert to Qdrant
-                self.qdrant_client.upsert(
-                    collection_name=self.collection_name,
-                    points=points
-                )
-                
-                stored_count += len(batch)
-                logging.info(f"Stored batch {i//batch_size + 1}: {len(batch)} documents")
-                
+                points = self.process_batch(batch)
+                self.upsert_to_qdrant(points)
+                stored_count += len(points)
+                logging.info(f"Stored batch {i//batch_size + 1}: {len(points)} documents")
             except Exception as e:
                 error_msg = f"Error processing batch {i//batch_size + 1}: {str(e)}"
                 logging.exception(error_msg)
@@ -249,6 +222,46 @@ class IngestionPipeline:
         
         logging.info(f"Ingestion complete: {stored_count}/{total_docs} documents stored")
         return result
+        
+        # Extract texts and metadata
+    def extract_from_documents(self, batch: List[Document]):
+        texts = [doc.page_content for doc in batch]
+        metadatas = [doc.metadata for doc in batch]
+        return texts, metadatas
+    
+    # Generate embeddings
+    def embed_documents(self, texts: List[str]):
+        return self.embeddings.embed_documents(texts)
+    
+    # Create points for Qdrant
+    def create_points(self, texts, embeddings, metadatas):
+        points = []
+        for text, embedding, metadata in zip(texts, embeddings, metadatas):
+            point_id = str(uuid.uuid4())
+            points.append(
+                PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload={
+                        "text": text,
+                        **metadata,
+                    }
+                )
+            )
+        return points
+    
+    # Upsert to Qdrant
+    def upsert_to_qdrant(self, points: List[PointStruct]):
+        self.qdrant_client.upsert(
+            collection_name=self.collection_name,
+            points=points
+        )
+    
+    # Process batch of documents before embedding and storing in Qdrant
+    def process_batch(self, batch: List[Document]):
+        texts, metadatas = self.extract_from_documents(batch)
+        embeddings = self.embed_documents(texts)
+        return self.create_points(texts, embeddings, metadatas)
     
     def ingest_from_azure(
         self,

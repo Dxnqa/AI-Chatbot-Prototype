@@ -1,6 +1,4 @@
 from qdrant_client import QdrantClient, models
-import os
-from dotenv import load_dotenv
 from config import QDRANT_URL, QDRANT_API_KEY
 
 # Qdrant client instance
