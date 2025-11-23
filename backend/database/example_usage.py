@@ -53,19 +53,19 @@ documents = pipeline.load_documents_from_azure(
     file_type="pdf",
 )
 
-# # Step 2: Chunk documents
-# chunks = pipeline.chunk_documents(documents)
+# Step 2: Chunk documents
+chunks = pipeline.chunk_documents(documents)
 
-# # Step 3: Embed and store
-# result = pipeline.embed_and_store(chunks, batch_size=50)
+# Step 3: Embed and store
+result = pipeline.embed_and_store(chunks, batch_size=50)
 
-# print(f"Stored {result['stored_count']} chunks out of {result['total_documents']}")
+print(f"Stored {result['stored_count']} chunks out of {result['total_documents']}")
 
-print(f"Loaded {len(documents)} documents\n")
+# print(f"Loaded {len(documents)} documents\n")
 
-for i, doc in enumerate[Document](documents, 1):
-    print(f"Document {i}")
-    print(f"Source blob: {doc.metadata.get('source')}")
-    print(f"Metadata: {doc.metadata}")     # full blob metadata
-    print(f"Preview:\n{doc.page_content}")  # first 500 chars
-    print("-" * 80)
+# for i, doc in enumerate[Document](documents, 1):
+#     print(f"Document {i}")
+#     print(f"Source blob: {doc.metadata.get('source')}")
+#     print(f"Metadata: {doc.metadata}")     # full blob metadata
+#     print(f"Preview:\n{doc.page_content}")  # first 500 chars
+#     print("-" * 80)

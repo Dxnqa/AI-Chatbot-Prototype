@@ -97,6 +97,17 @@ class IngestionPipeline:
                     f"Collection '{self.collection_name}' has vector size "
                     f"{collection_info.config.params.vectors.size}, expected {embedding_dim}"
                 )
+                
+        try:
+            self.qdrant_client.create_payload_index(
+                collection=self.collection_name,
+                field_name="title",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            logging.info("Created payload index for 'title' field")
+        except Exception as e:
+            if "already exists" not in str(e).lower():
+                logging.warning(f"Could not create title index: {e}")
     
     def _get_loader_factory(self, file_type: str):
         """
@@ -253,7 +264,20 @@ class IngestionPipeline:
     # Extract texts and metadata
     def extract_from_documents(self, batch: List[Document]):
         texts = [doc.page_content for doc in batch]
-        metadatas = [doc.metadata for doc in batch]
+        metadatas = []
+        for doc in batch:
+            metadata = doc.metadata.copy()
+            # Extract title from source (blob path) if not already present
+            if "title" not in metadata:
+                source = metadata.get("source", "")
+                # Extract filename from source path
+                if source:
+                    # Handle different source formats (Azure blob paths, local paths, etc.)
+                    title = source.split("/")[-1]  # Get last part of path
+                    # Remove query parameters if present
+                    title = title.split("?")[0]
+                    metadata["title"] = title
+            metadatas.append(metadata)
         return texts, metadatas
     
     # Generate embeddings
