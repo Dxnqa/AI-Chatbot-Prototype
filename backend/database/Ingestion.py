@@ -77,7 +77,10 @@ class IngestionPipeline:
         self._ensure_collection_exists()
     
     def _ensure_collection_exists(self):
-        """Create Qdrant collection if it doesn't exist with correct vector dimensions."""
+        """Create Qdrant collection if it doesn't exist with correct vector dimensions.
+        
+            Also creates payload indexes for match searching.
+        """
         embedding_dim = 1536  # OpenAI text-embedding-3-small dimension
         
         if not self.qdrant_client.collection_exists(self.collection_name):

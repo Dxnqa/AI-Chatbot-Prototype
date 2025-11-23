@@ -5,7 +5,7 @@ client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 print(f"Number of points in {QDRANT_COLLECTION_NAME}: {client.get_collection(QDRANT_COLLECTION_NAME).points_count}")
 
 retrieve_points = client.scroll(collection_name=QDRANT_COLLECTION_NAME,
-                                limit=10, 
+                                limit=100, 
                                 with_payload=True, 
                                 with_vectors=False,
                                 scroll_filter=models.Filter(
