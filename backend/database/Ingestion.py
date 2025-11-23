@@ -100,7 +100,7 @@ class IngestionPipeline:
                 
         try:
             self.qdrant_client.create_payload_index(
-                collection=self.collection_name,
+                collection_name=self.collection_name,
                 field_name="title",
                 field_schema=models.PayloadSchemaType.KEYWORD
             )

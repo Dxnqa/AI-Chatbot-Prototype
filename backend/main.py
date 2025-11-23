@@ -12,7 +12,7 @@ retrieve_points = client.scroll(collection_name=QDRANT_COLLECTION_NAME,
                                     must=[
                                         models.FieldCondition(
                                             key="title",
-                                            match=models.MatchValue(value="candlestick")
+                                            match=models.MatchValue(value="candlesticks.pdf")
                                         ),
                                     ]
                                 )
