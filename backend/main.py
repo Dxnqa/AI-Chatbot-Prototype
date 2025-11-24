@@ -17,8 +17,6 @@ retrieve_points = client.scroll(collection_name=QDRANT_COLLECTION_NAME,
                                     ]
                                 )
                                 )
-# for point in retrieve_points:
-#     print(point)
 
 for point in retrieve_points[0]:
     print(f"ID: {point.id}")
