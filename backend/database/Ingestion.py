@@ -1,6 +1,8 @@
 from typing import List, Optional
 import logging
 import uuid
+from azure.storage.blob import BlobServiceClient
+from azure.identity import DefaultAzureCredential
 from langchain_azure_storage.document_loaders import AzureBlobStorageLoader
 from langchain_community.document_loaders import (
     PyPDFLoader,
@@ -111,6 +113,13 @@ class IngestionPipeline:
         except Exception as e:
             if "already exists" not in str(e).lower():
                 logging.warning(f"Could not create title index: {e}")
+                
+                
+    def update_collection(self, collection_name: str = QDRANT_COLLECTION_NAME):
+        """Update the collection name if needed."""
+        self.collection_name = collection_name
+        self._ensure_collection_exists()
+        
     
     def _get_loader_factory(self, file_type: str):
         """
@@ -131,6 +140,29 @@ class IngestionPipeline:
             "markdown": UnstructuredMarkdownLoader,
         }
         return loader_map.get(file_type)
+    
+    def list_all_blob_names(self, directory: str = "Finance", file_extension: Optional[str] = None, credential: str = DefaultAzureCredential) -> list[str]:
+        """List all blob names in the specified directory.
+
+        Args:
+            directory (str, optional): The directory to search for blobs. Defaults to "Finance".
+            file_extension (Optional[str], optional): Filter blobs by file extension. Defaults to None.
+            credential (str, optional): Azure credential for authentication. Defaults to DefaultAzureCredential.
+        Returns:
+            list[str]: list of blob names
+        """
+        blob_service_client = BlobServiceClient(account_url=ACCOUNT_URL, credential=credential)
+
+        container_client = blob_service_client.get_container_client(BLOB_CONTAINER)
+        
+        blob_names = []
+        blob_names.extend(
+            blob.name
+            for blob in container_client.list_blobs(name_starts_with=directory)
+            if file_extension is None or blob.name.endswith(file_extension)
+        )
+        return blob_names
+
     
     def load_documents_from_azure(
         self,
