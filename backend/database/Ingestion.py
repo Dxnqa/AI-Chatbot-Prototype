@@ -152,15 +152,15 @@ class IngestionPipeline:
             list[str]: list of blob names
         """
         blob_service_client = BlobServiceClient(account_url=ACCOUNT_URL, credential=credential)
-
         container_client = blob_service_client.get_container_client(BLOB_CONTAINER)
         
         blob_names = []
         blob_names.extend(
-            blob.name
+            blob.name.replace(f"{directory}/", "").replace(f"{directory}\\", "")
             for blob in container_client.list_blobs(name_starts_with=directory)
             if file_extension is None or blob.name.endswith(file_extension)
         )
+        logging.info(f"Found {len(blob_names)} blobs in directory '{directory}'")
         return blob_names
 
     
