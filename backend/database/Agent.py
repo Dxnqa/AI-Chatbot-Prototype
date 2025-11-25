@@ -1,6 +1,6 @@
 from openai import OpenAI
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, ScoredPoint, QueryRequest, QueryVector
+from qdrant_client.models import ScoredPoint
 from .Ingestion import IngestionPipeline
 from config import (
     QDRANT_URL,
@@ -62,9 +62,9 @@ class RAG:
         
         pipeline.embed_and_store(chunks)
         
-    def process_user_prompts(self, user_prompt:str, model:str="text-embedding-3-small") -> list[float]:
-        user_prompt = user_prompt.replace("\n"," ")
-        return self.openai_client.embeddings.create(model=model, input=user_prompt, dimensions=1536).data[0].embedding
+    def process_user_prompts(self, query:str, model:str="text-embedding-3-small") -> list[float]:
+        query = query.replace("\n"," ")
+        return self.openai_client.embeddings.create(model=model, input=query, dimensions=1536).data[0].embedding
     
     def retrieve_similar_documents(self, query_embedding:list[float], top_k:int=3) -> list[ScoredPoint]:
         """Retrieve similar documents from the Qdrant collection.
@@ -91,10 +91,9 @@ class RAG:
             raise ValueError(f"top_k must not exceed 100, got {top_k}.")
         
         try:
-            query_vector = QueryVector(vector=query_embedding)
             response = self.qdrant_client.query_points(
                 collection_name=self.collection_name,
-                query=query_vector,
+                query=query_embedding,
                 limit=top_k,
                 with_payload=True,
                 with_vectors=False,

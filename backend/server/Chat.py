@@ -11,7 +11,7 @@ class Chat:
         user (str): Optional user identifier for containerized sessions.
     """
     
-    def __init__(self, model: str = "gpt-4o", key: str = OPENAI_API_KEY, user: str = None):
+    def __init__(self, model: str = "gpt-5o", key: str = OPENAI_API_KEY, user: str = None):
         self.client = OpenAI(api_key=key)
         self.model = model
         self.user = user
