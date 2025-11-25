@@ -113,7 +113,7 @@ class IngestionPipeline:
         except Exception as e:
             if "already exists" not in str(e).lower():
                 logging.warning(f"Could not create title index: {e}")
-                
+
                 
     def update_collection(self, collection_name: str = QDRANT_COLLECTION_NAME):
         """Update the collection name if needed."""

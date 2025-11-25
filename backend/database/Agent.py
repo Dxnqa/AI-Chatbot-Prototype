@@ -29,27 +29,36 @@ class RAG:
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY
     )
-
-    # Class methods
     
-    def InitiatePipeline(self, collection_exists: bool = False):
+    # Class methods
+    def InitiatePipeline(self):
         """Initialize the ingestion pipeline.
-
-        Args:
-            collection_exists (bool, required): Whether the collection already exists. If False, the collection will be created. Otherwise, the existing collection will be used.
-            directory (str, optional): The directory from which to load documents. Defaults to "Finance" for testing purposes.
+        
+        If the collection doesn't exist, it will:
+        1. Create the collection
+        2. Chunk documents
+        3. Embed and store documents
+        
+        If the collection exists, the process is skipped to avoid duplication.
         """
-        if collection_exists:
-            blob_names = self.list_all_blob_names(directory=self.directory)
-            
-            pipeline = IngestionPipeline(
-                collection_name=self.collection_name,
-                embedding_model="text-embedding-3-small",
-                chunk_size=1000,
-                chunk_overlap=200
-            )  
-            
-            documents = pipeline.load_documents_from_azure(
-                blob_names=blob_names,
-                directory=self.directory,
-            )
+        # Check if collection exists - if it does, skip to avoid duplication
+        if self.qdrant_client.collection_exists(collection_name=self.collection_name):
+            return
+        
+        # Collection doesn't exist - run the full pipeline
+        pipeline = IngestionPipeline(
+            collection_name=self.collection_name,
+            embedding_model="text-embedding-3-small",
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+
+        blob_names = pipeline.list_all_blobs_names(directory=self.directory)
+        documents = pipeline.load_documents_from_azure(
+            blob_names=blob_names,
+            directory=self.directory
+        )
+        
+        chunks = pipeline.chunk_documents(documents)
+        
+        pipeline.embed_and_store(chunks)
