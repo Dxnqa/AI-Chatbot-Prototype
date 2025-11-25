@@ -1,5 +1,6 @@
 from openai import OpenAI
-from qdrant_client import QdrantClient, models
+from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, ScoredPoint, QueryRequest, QueryVector
 from .Ingestion import IngestionPipeline
 from config import (
     QDRANT_URL,
@@ -65,10 +66,40 @@ class RAG:
         user_prompt = user_prompt.replace("\n"," ")
         return self.openai_client.embeddings.create(model=model, input=user_prompt, dimensions=1536).data[0].embedding
     
-    def retrieve_similar_documents(self, query_embedding:list, top_k:int=3):
-        return self.qdrant_client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=top_k
-        )
+    def retrieve_similar_documents(self, query_embedding:list[float], top_k:int=3) -> list[ScoredPoint]:
+        """Retrieve similar documents from the Qdrant collection.
+
+        Args:
+            query_embedding (list[float]): The embedding vector for the query.
+            top_k (int, optional): The number of top similar documents to retrieve. Defaults to 3.
+
+        Raises:
+            ValueError: If the query_embedding is not of length 1536.
+            ValueError: If top_k is not positive.
+            Exception: If there is an error retrieving documents from Qdrant.
+
+        Returns:
+            list[ScoredPoint]: A list of scored points representing the similar documents.
+        """
         
+        
+        if len(query_embedding) != 1536:
+            raise ValueError(f"Query embedding must be of length 1536, got {len(query_embedding)}.")
+        if top_k <= 0:
+            raise ValueError(f"top_k must be positive, got {top_k}.")
+        elif top_k > 100:
+            raise ValueError(f"top_k must not exceed 100, got {top_k}.")
+        
+        try:
+            query_vector = QueryVector(vector=query_embedding)
+            response = self.qdrant_client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                limit=top_k,
+                with_payload=True,
+                with_vectors=False,
+            )
+            return response.points
+            
+        except Exception as e:
+            raise Exception(f"Error retrieving similar documents: {e}") from e
