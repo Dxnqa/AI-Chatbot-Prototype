@@ -2,7 +2,6 @@ from openai import OpenAI
 from qdrant_client import QdrantClient, models
 from .Ingestion import IngestionPipeline
 from config import (
-    OPENAI_API_KEY,
     QDRANT_URL,
     QDRANT_API_KEY,
     QDRANT_COLLECTION_NAME
@@ -18,20 +17,18 @@ class RAG:
         directory (str): The directory from which to load documents. Default is "Finance" for testing purposes.
     """
 
-    def __init__(self, collection_name: str = QDRANT_COLLECTION_NAME, directory: str = "Finance"):
+    def __init__(self, openai_api_key: str, collection_name: str = QDRANT_COLLECTION_NAME,directory: str = "Finance",):
+        
         self.collection_name = collection_name
         self.directory = directory
-        
-    # Client instances
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-
-    qdrant_client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY
-    )
+        self.openai_client = OpenAI(api_key=openai_api_key)
+        self.qdrant_client = QdrantClient(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY
+        )
     
     # Class methods
-    def InitiatePipeline(self):
+    def InitiatePipeline(self, qdrant_url: str):
         """Initialize the ingestion pipeline.
         
         If the collection doesn't exist, it will:
@@ -47,6 +44,7 @@ class RAG:
         
         # Collection doesn't exist - run the full pipeline
         pipeline = IngestionPipeline(
+            qdrant_url=qdrant_url,
             collection_name=self.collection_name,
             embedding_model="text-embedding-3-small",
             chunk_size=1000,
@@ -62,3 +60,15 @@ class RAG:
         chunks = pipeline.chunk_documents(documents)
         
         pipeline.embed_and_store(chunks)
+        
+    def process_user_prompts(self, user_prompt:str, model:str="text-embedding-3-small") -> list[float]:
+        user_prompt = user_prompt.replace("\n"," ")
+        return self.openai_client.embeddings.create(model=model, input=user_prompt, dimensions=1536).data[0].embedding
+    
+    def retrieve_similar_documents(self, query_embedding:list, top_k:int=3):
+        return self.qdrant_client.search(
+            collection_name=self.collection_name,
+            query_vector=query_embedding,
+            limit=top_k
+        )
+        
