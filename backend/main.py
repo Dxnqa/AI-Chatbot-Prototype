@@ -9,9 +9,8 @@ agent = RAG(collection_name=QDRANT_COLLECTION_NAME, directory="Finance", openai_
 # pipeline = agent.InitiatePipeline(qdrant_url=QDRANT_URL,)
 
 # # Chatbot instance
-# chat = Chat(model="gpt-5o", key=OPENAI_API_KEY,)
-processed_response = agent.process_user_prompts(query="What is the impact of inflation on stock markets?")
+chatbot = Chat(model="gpt-5o", key=OPENAI_API_KEY, rag_agent=agent)
 
-semantic_search_results = agent.retrieve_similar_documents(query_embedding=processed_response, top_k=3)
+user_input = input("Enter your question: ").strip()
 
-print(semantic_search_results)
+retrieve_context = chatbot.retrieve_context(query=user_input)

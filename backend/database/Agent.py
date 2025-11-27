@@ -62,16 +62,13 @@ class RAG:
         
         pipeline.embed_and_store(chunks)
         
-    def process_user_prompts(self, query:str, model:str="text-embedding-3-small") -> list[float]:
-        query = query.replace("\n"," ")
-        return self.openai_client.embeddings.create(model=model, input=query, dimensions=1536).data[0].embedding
     
-    def retrieve_similar_documents(self, query_embedding:list[float], top_k:int=3) -> list[ScoredPoint]:
+    def similarity_search(self, query_embedding:list[float], top_k:int=6) -> list[ScoredPoint]:
         """Retrieve similar documents from the Qdrant collection.
 
         Args:
             query_embedding (list[float]): The embedding vector for the query.
-            top_k (int, optional): The number of top similar documents to retrieve. Defaults to 3.
+            top_k (int, optional): The number of top similar documents to retrieve. Defaults to 6.
 
         Raises:
             ValueError: If the query_embedding is not of length 1536.
@@ -97,6 +94,7 @@ class RAG:
                 limit=top_k,
                 with_payload=True,
                 with_vectors=False,
+                score_threshold=0.4
             )
             return response.points
             
