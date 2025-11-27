@@ -13,14 +13,14 @@ class Chat:
     Chat class for handling user queries and generating responses using OpenAI LLMs.
     
     Args:
-        model (str): The OpenAI model to use for generating responses. Default is "gpt-5o".
+        model (str): The OpenAI model to use for generating responses. Default is "gpt-5-mini".
         key (str): The OpenAI API key for authentication. Default is taken from config.
         user (str): Optional user identifier for containerized sessions.
     """
     
     def __init__(
         self,
-        model: str = "gpt-5o",
+        model: str = "gpt-5-mini",
         key: str = OPENAI_API_KEY,
         user: str = None, rag_agent: RAG | None = None
         ):
@@ -41,10 +41,7 @@ class Chat:
         f"If the answer is not within context, respond with: {content_not_found}"
     )
 
-# Class methods
-    def run_agent(self, embedded_query:list[float], top_k:int=6) -> str:
-        pass
-
+# Main methods
     def model_response(self, query: str, system: str = INSTRUCTIONS) -> str:
         # Format user input with context
         response = self.client.responses.create(
@@ -57,7 +54,17 @@ class Chat:
         return response.output_text.replace("\n", " ").strip()
     
     def query_pipeline(self, query:str) -> str:
-        pass
+        # Step 1: Embed the user query
+        embeddings = self.embed_queries(query=query)
+
+        # Step 2: Retrieve relevant context using RAG agent
+        context = self.retrieve_context(embeddings=embeddings, limit=6)
+
+        # Step 3: Generate final response using LLM with context
+        final_response = self.model_response(query=query, system=f"{self.INSTRUCTIONS}\n\nContext:\n{context}")
+        
+        logging.info("Generated final response for user query.")
+        return final_response
     
     # Helper methods        
     def embed_queries(self, query:str, model:str="text-embedding-3-small") -> list[float]:

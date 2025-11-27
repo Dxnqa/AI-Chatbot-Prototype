@@ -9,8 +9,8 @@ agent = RAG(collection_name=QDRANT_COLLECTION_NAME, directory="Finance", openai_
 # pipeline = agent.InitiatePipeline(qdrant_url=QDRANT_URL,)
 
 # # Chatbot instance
-chatbot = Chat(model="gpt-5o", key=OPENAI_API_KEY, rag_agent=agent)
+chatbot = Chat(model="gpt-5-mini", key=OPENAI_API_KEY, rag_agent=agent)
 
 user_input = input("Enter your question: ").strip()
 
-retrieve_context = chatbot.retrieve_context(query=user_input)
+print(f"\n{chatbot.query_pipeline(user_input)}")
