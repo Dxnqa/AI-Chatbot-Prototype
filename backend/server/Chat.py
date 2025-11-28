@@ -79,7 +79,7 @@ class Chat:
 
         documents = self.agent.similarity_search(query_embedding=embeddings, top_k=limit)
         
-        if results := [doc.payload.get("text", "") for doc in documents]:
+        if results := [{"id": doc.id ,"text": doc.payload.get("text", ""), "score": doc.score} for doc in documents]:
             logging.info(f"Formatting {len(results)} results for response.")
             return self.format_results(results=results)
         else:
@@ -87,30 +87,21 @@ class Chat:
             return self.content_not_found
         
     
-    def format_results(self, results:list[str], model:str = "gpt-5-mini", max_chars:int = 5000) -> str:
+    def format_results(self, results:list[dict], max_chars:int = 8000) -> str:
+        # Format the retrieved results into a single context string
         if not results:
             return self.content_not_found
         
-        context = "\n\n".join(results).strip()
+        context = "\n\n".join([r["text"] for r in results]).strip()
         
         if not context:
             return self.content_not_found
 
         if len(context) > max_chars:
             context = context[:max_chars]
-
-        try:
-            formatted_results = self.client.responses.create(
-                model=model,
-                input=[
-                    {"role": "system", "content": "Using the provided context, Summarize the information into a single response."},
-                    {"role": "developer", "content": "Focus on clarity and conciseness. Avoid unnecessary details."},
-                    {"role": "user", "content": f"Context:\n{context}"}
-                ]
-            )
-            logging.info("Successfully formatted results using LLM.")
-            logging.info(f"Context used: {context}")
-            return formatted_results.output_text.replace("\n", " ").strip()
-        except Exception as e:
-            logging.error(f"Error formatting results: {e}")
-            return self.content_not_found
+            
+        average_score = sum(r["score"] for r in results) / len(results)
+        logging.info(f"Average similarity score of retrieved documents: {average_score:.4f}")
+        logging.info(f"Formatted context length: {len(context)} characters.")
+        logging.info(context)
+        return context
