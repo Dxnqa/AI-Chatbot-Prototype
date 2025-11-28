@@ -58,11 +58,11 @@ class Chat:
         # Step 1: Embed the user query
         embeddings = self.embed_queries(query=query)
 
-        # Step 2: Retrieve relevant context using RAG agent
-        context = self.retrieve_context(embeddings=embeddings, limit=6)
+        # Step 2: Retrieve and format relevant context using the RAG agent
+        formatted_context = self.retrieve_context(embeddings=embeddings, limit=6)
 
         # Step 3: Generate final response using LLM with context
-        final_response = self.model_response(question=query, context=context)
+        final_response = self.model_response(question=query, context=formatted_context)
         
         logging.info("Generated final response for user query.")
         return final_response
@@ -73,35 +73,68 @@ class Chat:
         logging.info(f"Generated embedding for query of length {len(query)}.")
         return embedding
 
-    def retrieve_context(self, embeddings: list[float], limit:int=6) -> str:
+    def retrieve_context(self, embeddings: list[float], limit:int=6, max_chars:int=8000) -> str:
+        """Retrieve and format context from RAG agent based on a list of embeddings. Takes top-k similar documents and concatenates their text content.
+
+        Args:
+            embeddings (list[float]): list of embeddings representing the user query.
+            limit (int, optional): number of top similar documents to retrieve. Defaults to 6.
+            max_chars (int, optional): maximum number of characters for the concatenated context. Defaults to 8000.
+
+        Raises:
+            ValueError: raises an error if RAG agent is not initialized.
+
+        Returns:
+            str: concatenated context from top-k similar documents. Pass to LLM for final response generation.
+        """
+        
+        # System checks and initilizations
         if self.agent is None:
             raise ValueError("RAG agent is not initialized. Cannot retrieve context.")
 
         documents = self.agent.similarity_search(query_embedding=embeddings, top_k=limit)
         
-        if results := [{"id": doc.id ,"text": doc.payload.get("text", ""), "score": doc.score} for doc in documents]:
-            logging.info(f"Formatting {len(results)} results for response.")
-            return self.format_results(results=results)
-        else:
+        results = [
+            {"id": doc.id, "text": doc.payload.get("text", ""), "score": doc.score}
+            for doc in documents
+        ]
+
+        if not results:
             logging.warning("No relevant documents found for the given query embedding.")
             return self.content_not_found
-        
-    
-    def format_results(self, results:list[dict], max_chars:int = 8000) -> str:
-        # Format the retrieved results into a single context string
-        if not results:
-            return self.content_not_found
-        
-        context = "\n\n".join([r["text"] for r in results]).strip()
-        
+
+        # Formatting the retrieved context
+        context = "\n\n".join(r["text"] for r in results).strip()
+
         if not context:
             return self.content_not_found
 
         if len(context) > max_chars:
             context = context[:max_chars]
-            
+        
+        # Logging information
         average_score = sum(r["score"] for r in results) / len(results)
         logging.info(f"Average similarity score of retrieved documents: {average_score:.4f}")
         logging.info(f"Formatted context length: {len(context)} characters.")
-        logging.info(context)
+        
+        # (Optional): Display information to user
+        display_choice = input("Display additional information? (y/n): ").lower().strip()
+        self.additional_information(info=results, display=display_choice)
+        
         return context
+    
+    def additional_information(self, info:list[dict], display:str) -> None:
+        if display.strip().lower() == "y":
+            print("\n--- Information ---")
+            for idx, item in enumerate(info, start=1):
+                self.display_information(idx, item)
+        else:
+            logging.info("User opted not to display additional information.")
+
+    def display_information(self, idx, item):
+        print(f"Document {idx}:")
+        print(f"ID: {item['id']}")
+        print(f"Score: {item['score'] * 100:.2f}%")
+        print(f"Length: {len(item['text'])} characters")
+        print(f"Contents:\n\n{item['text']}")
+        print("-------------------\n")
