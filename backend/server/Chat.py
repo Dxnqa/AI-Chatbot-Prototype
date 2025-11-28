@@ -20,7 +20,7 @@ class Chat:
     
     def __init__(
         self,
-        model: str = "gpt-5-mini",
+        model: str = "gpt-5.1",
         key: str = OPENAI_API_KEY,
         user: str = None, rag_agent: RAG | None = None
         ):
@@ -37,19 +37,20 @@ class Chat:
     content_not_found = "I'm sorry, but I couldn't find any relevant information to answer your question."
 
     INSTRUCTIONS = (
-        f"Use the provided context to return a helpful answer for the user's query. Format the response clearly and concisely. "
-        f"If the answer is not within context, respond with: {content_not_found}"
+        f"Act as a Q&A assistant. Use the provided context to answer the user's question accurately and concisely. Stay focused on the user's question and avoid adding unnecessary information"
+        f"If you don't have an answer, respond with: The information is not available in the provided context."
     )
 
 # Main methods
-    def model_response(self, query: str, system: str = INSTRUCTIONS) -> str:
+    def model_response(self, question: str, context: str, system: str = INSTRUCTIONS) -> str:
         # Format user input with context
         response = self.client.responses.create(
             model=self.model,
             input=[
                 {"role": "system", "content": system},
-                {"role": "user", "content": query.strip()},
-            ]
+                {"role": "developer", "content": f"Context:\n{context}"},
+                {"role": "user", "content": question.strip()},
+            ],
         )
         return response.output_text.replace("\n", " ").strip()
     
@@ -61,7 +62,7 @@ class Chat:
         context = self.retrieve_context(embeddings=embeddings, limit=6)
 
         # Step 3: Generate final response using LLM with context
-        final_response = self.model_response(query=query, system=f"{self.INSTRUCTIONS}\n\nContext:\n{context}")
+        final_response = self.model_response(question=query, context=context)
         
         logging.info("Generated final response for user query.")
         return final_response
@@ -86,7 +87,7 @@ class Chat:
             return self.content_not_found
         
     
-    def format_results(self, results:list[str], model:str = "gpt-5-nano", max_chars:int = 8000) -> str:
+    def format_results(self, results:list[str], model:str = "gpt-5-mini", max_chars:int = 5000) -> str:
         if not results:
             return self.content_not_found
         
@@ -102,12 +103,13 @@ class Chat:
             formatted_results = self.client.responses.create(
                 model=model,
                 input=[
-                    {"role": "system", "content": "You are a helpful assistant that summarizes context for downstream QA."},
-                    {"role": "developer", "content": "Read the provided context and rewrite it concisely as one clear summary. Avoid speculation."},
+                    {"role": "system", "content": "Using the provided context, Summarize the information into a single response."},
+                    {"role": "developer", "content": "Focus on clarity and conciseness. Avoid unnecessary details."},
                     {"role": "user", "content": f"Context:\n{context}"}
                 ]
             )
             logging.info("Successfully formatted results using LLM.")
+            logging.info(f"Context used: {context}")
             return formatted_results.output_text.replace("\n", " ").strip()
         except Exception as e:
             logging.error(f"Error formatting results: {e}")

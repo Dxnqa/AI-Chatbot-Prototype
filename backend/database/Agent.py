@@ -7,7 +7,12 @@ from config import (
     QDRANT_API_KEY,
     QDRANT_COLLECTION_NAME
     )
+import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
 
 # Ingestion pipeline
 class RAG:
@@ -96,6 +101,8 @@ class RAG:
                 with_vectors=False,
                 score_threshold=0.4
             )
+            for point in response.points:
+                logging.info(f"Retrieved point ID: {point.id} with score: {point.score}")
             return response.points
             
         except Exception as e:
