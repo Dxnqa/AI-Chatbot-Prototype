@@ -37,7 +37,7 @@ class Chat:
     content_not_found = "I'm sorry, but I couldn't find any relevant information to answer your question."
 
     INSTRUCTIONS = (
-        f"Act as a Q&A assistant. Use the provided context to answer the user's question accurately and concisely. Stay focused on the user's question and avoid adding unnecessary information"
+        f"Act as a Q&A assistant. Use the provided context to answer the user's question accurately and concisely"
         f"If you don't have an answer, respond with: The information is not available in the provided context."
     )
 
@@ -59,7 +59,7 @@ class Chat:
         embeddings = self.embed_queries(query=query)
 
         # Step 2: Retrieve and format relevant context using the RAG agent
-        formatted_context = self.retrieve_context(embeddings=embeddings, limit=6)
+        formatted_context = self.retrieve_context(embeddings=embeddings, limit=10)
 
         # Step 3: Generate final response using LLM with context
         final_response = self.model_response(question=query, context=formatted_context)
@@ -73,7 +73,7 @@ class Chat:
         logging.info(f"Generated embedding for query of length {len(query)}.")
         return embedding
 
-    def retrieve_context(self, embeddings: list[float], limit:int=6, max_chars:int=8000) -> str:
+    def retrieve_context(self, embeddings: list[float], limit:int=10, max_chars:int=8000, display_info:bool=False) -> str:
         """Retrieve and format context from RAG agent based on a list of embeddings. Takes top-k similar documents and concatenates their text content.
 
         Args:
@@ -118,13 +118,13 @@ class Chat:
         logging.info(f"Formatted context length: {len(context)} characters.")
         
         # (Optional): Display information to user
-        display_choice = input("Display additional information? (y/n): ").lower().strip()
-        self.additional_information(info=results, display=display_choice)
+        if display_info:
+            self.additional_information(info=results, display="y")
         
         return context
     
-    def additional_information(self, info:list[dict], display:str) -> None:
-        if display.strip().lower() == "y":
+    def additional_information(self, info:list[dict], display:bool=True) -> None:
+        if display:
             print("\n--- Information ---")
             for idx, item in enumerate(info, start=1):
                 self.display_information(idx, item)

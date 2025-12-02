@@ -141,7 +141,7 @@ class IngestionPipeline:
         }
         return loader_map.get(file_type)
     
-    def list_all_blob_names(self, directory: str = "Finance", file_extension: Optional[str] = None, credential: str = DefaultAzureCredential) -> list[str]:
+    def list_all_blob_names(self, directory: str = "Finance", file_extension: Optional[str] = None, credential: str = DefaultAzureCredential()) -> list[str]:
         """List all blob names in the specified directory.
 
         Args:

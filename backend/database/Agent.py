@@ -46,7 +46,7 @@ class RAG:
         """
         # Check if collection exists - if it does, skip to avoid duplication
         if self.qdrant_client.collection_exists(collection_name=self.collection_name):
-            return
+            return logging.info(f"Collection '{self.collection_name}' already exists. Skipping ingestion pipeline.")
         
         # Collection doesn't exist - run the full pipeline
         pipeline = IngestionPipeline(
@@ -57,7 +57,7 @@ class RAG:
             chunk_overlap=200
         )
 
-        blob_names = pipeline.list_all_blobs_names(directory=self.directory)
+        blob_names = pipeline.list_all_blob_names(directory=self.directory)
         documents = pipeline.load_documents_from_azure(
             blob_names=blob_names,
             directory=self.directory
@@ -66,6 +66,8 @@ class RAG:
         chunks = pipeline.chunk_documents(documents)
         
         pipeline.embed_and_store(chunks)
+        logging.info(f"Ingestion pipeline completed and data stored in collection '{self.collection_name}'.")
+        logging.info(f"Size of collection = {self.qdrant_client.get_collection(collection_name=self.collection_name).points_count} points.")
         
     
     def similarity_search(self, query_embedding:list[float], top_k:int=6) -> list[ScoredPoint]:

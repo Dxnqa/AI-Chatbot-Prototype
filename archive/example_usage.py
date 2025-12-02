@@ -6,7 +6,7 @@ into Qdrant vector database.
 """
 
 from langchain_core.documents.base import Document
-from .Ingestion import IngestionPipeline
+from ..backend.database.Ingestion import IngestionPipeline
 
 # Initialize the ingestion pipeline
 pipeline = IngestionPipeline(

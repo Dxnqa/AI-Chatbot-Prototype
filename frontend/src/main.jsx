@@ -2,55 +2,34 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./styles/styles.css";
 
-const { useMemo, useState } = React;
-
-const initialConversation = [
-  {
-    id: "intro-1",
-    role: "assistant",
-    content:
-      "Hi! I’m ready whenever you are. Send a prompt or pick one of the quick starters below.",
-    timestamp: "just now",
-  },
-  {
-    id: "intro-2",
-    role: "user",
-    content:
-      "Give me an outline for a launch email announcing our AI assistant.",
-    timestamp: "just now",
-  },
-  {
-    id: "intro-3",
-    role: "assistant",
-    content:
-      "Absolutely. I’ll keep the tone friendly and confident, highlight the assistant’s value, and end with a crisp CTA.",
-    timestamp: "just now",
-  },
-];
+const { useState } = React;
 
 const quickPrompts = [
   {
     id: "prompt-1",
-    title: "Summarize research",
-    detail: "Turn messy notes into a clear brief",
+    title: "Knowledge management - Q&A",
+    detail: "Answer a question with context-based searching",
+    command: "/retrieve: "
   },
   {
     id: "prompt-2",
-    title: "Brainstorm angles",
-    detail: "Rapid-fire ideas for campaigns",
+    title: "Ticket ingestion",
+    detail: "State an issue to automatically create a ticket.",
+    command: "/ingest: "
   },
   {
     id: "prompt-3",
-    title: "Rewrite copy",
-    detail: "Polish tone, keep intent",
+    title: "Web search",
+    detail: "Activate web search to find answers on the internet",
+    command:"/search: "
   },
 ];
 
 const Chat = () => {
-  const seededMessages = useMemo(() => initialConversation, []);
-  const [messages, setMessages] = useState(seededMessages);
+  const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
 
   const pushMessage = (role, content) => {
     setMessages((prev) => [
@@ -67,7 +46,7 @@ const Chat = () => {
     ]);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmed = message.trim();
     if (!trimmed || isThinking) return;
@@ -76,14 +55,39 @@ const Chat = () => {
     setMessage("");
     setIsThinking(true);
 
-    // Placeholder for backend call – simulate response latency for UI feedback.
-    setTimeout(() => {
+    try {
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: trimmed,
+          conversation_id: conversationId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Update conversation ID for tracking
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
+      }
+
+      pushMessage("assistant", data.response);
+    } catch (error) {
+      console.error("Chat API error:", error);
       pushMessage(
         "assistant",
-        "On it. I’ll draft a thoughtful response once the backend is connected."
+        "Sorry, something went wrong. Please try again."
       );
+    } finally {
       setIsThinking(false);
-    }, 800);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -121,7 +125,7 @@ const Chat = () => {
             >
               <div className="message__bubble">
                 <span className="message__role">
-                  {entry.role === "user" ? "You" : "AI"}
+                  {entry.role === "user" ? "You" : "Prototype"}
                 </span>
                 <p>{entry.content}</p>
               </div>
@@ -144,7 +148,7 @@ const Chat = () => {
               key={prompt.id}
               className="quick-prompts__item"
               type="button"
-              onClick={() => handlePromptSelect(prompt.title)}
+              onClick={() => handlePromptSelect(prompt.command)}
             >
               <strong>{prompt.title}</strong>
               <span>{prompt.detail}</span>
