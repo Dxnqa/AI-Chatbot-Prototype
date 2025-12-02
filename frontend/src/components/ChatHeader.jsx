@@ -1,7 +1,6 @@
 import React from "react";
-import QuickPrompts from "./QuickPrompts";
 
-const ChatHeader = ({ onPromptSelect, onNewChat }) => {
+const ChatHeader = ({ onNewChat }) => {
   return (
     <header className="chat-panel__header">
       <div className="chat-panel__identity">
@@ -12,7 +11,6 @@ const ChatHeader = ({ onPromptSelect, onNewChat }) => {
           </div>
           <div className="identity__meta-row">
             <p className="identity__meta">Knowledge base specialist</p>
-            <QuickPrompts onPromptSelect={onPromptSelect} />
           </div>
         </div>
       </div>

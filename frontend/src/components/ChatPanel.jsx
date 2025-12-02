@@ -67,10 +67,6 @@ const ChatPanel = () => {
     }
   };
 
-  const handlePromptSelect = (prompt) => {
-    setMessage(prompt);
-  };
-
   const handleNewChat = () => {
     setMessages([]);
     setMessage("");
@@ -79,10 +75,7 @@ const ChatPanel = () => {
 
   return (
     <div className="chat-panel">
-      <ChatHeader
-        onPromptSelect={handlePromptSelect}
-        onNewChat={handleNewChat}
-      />
+      <ChatHeader onNewChat={handleNewChat} />
       <ChatFeed messages={messages} isThinking={isThinking} />
       <Composer
         message={message}
